@@ -124,3 +124,7 @@ hs_err_pid*
 
 # Cache of project
 .gradletasknamecache
+
+
+# Connection to db, ommit this to keep the default connection params
+src/main/kotlin/Database.kt
