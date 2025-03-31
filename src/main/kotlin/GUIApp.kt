@@ -7,22 +7,30 @@ import javafx.scene.control.Label
 import javafx.scene.control.TextField
 import javafx.scene.layout.VBox
 import javafx.stage.Stage
+import services.persona.*
+import java.sql.Date
 
 class GUIApp : Application() {
 
-    private var currentOffset = 0 // Para paginar la lista de clientes
+    private var currentOffset = 0 // For pagination
 
     override fun start(stage: Stage) {
         val operationSelector = ComboBox<String>()
         operationSelector.items.addAll("Insertar", "Actualizar", "Eliminar", "Listar")
         operationSelector.value = "Insertar"
 
-        // Campos reutilizables
-        val idField = TextField().apply { promptText = "ID Cliente" }
+        // Reusable fields
+        val dniField = TextField().apply { promptText = "DNI" }
         val firstNameField = TextField().apply { promptText = "Nombre" }
-        val lastNameField = TextField().apply { promptText = "Apellido" }
+        val lastName1Field = TextField().apply { promptText = "Primer Apellido" }
+        val lastName2Field = TextField().apply { promptText = "Segundo Apellido" }
+        val birthDateField = TextField().apply { promptText = "Fecha de Nacimiento (YYYY-MM-DD)" }
+        val phoneField = TextField().apply { promptText = "Teléfono" }
         val emailField = TextField().apply { promptText = "Email" }
-        val newEmailField = TextField().apply { promptText = "Nuevo Email" }
+        val roleSelector = ComboBox<String>().apply {
+            items.addAll("Ninguno", "Metge", "Tecnic", "Pacient")
+            value = "Ninguno"
+        }
 
         val output = Label()
         val executeButton = Button("Ejecutar operación")
@@ -30,92 +38,81 @@ class GUIApp : Application() {
         val container = VBox(10.0)
         container.padding = Insets(20.0)
 
-        // Función para actualizar los campos visibles según la operación
+        // Function to update visible fields based on the selected operation
         fun updateForm(selected: String) {
             container.children.setAll(operationSelector)
             when (selected) {
-                "Insertar" -> container.children.addAll(firstNameField, lastNameField, emailField, executeButton, output)
-                "Actualizar" -> container.children.addAll(idField, newEmailField, executeButton, output)
-                "Eliminar" -> container.children.addAll(idField, executeButton, output)
-                "Listar" -> container.children.addAll(executeButton, output)
+                "Insertar", "Actualizar" -> {
+                    container.children.addAll(dniField, firstNameField, lastName1Field, lastName2Field, birthDateField, phoneField, emailField, roleSelector, executeButton, output)
+                }
+                "Eliminar" -> {
+                    container.children.addAll(dniField, executeButton, output)
+                }
+                "Listar" -> {
+                    container.children.addAll(executeButton, output)
+                }
             }
         }
 
-        // Acción del botón
+        // Button action
         executeButton.setOnAction {
             when (operationSelector.value) {
                 "Insertar" -> {
-                    if (firstNameField.text.isNotBlank() && lastNameField.text.isNotBlank() && emailField.text.isNotBlank()) {
-                        insertCustomer(firstNameField.text, lastNameField.text, emailField.text)
-                        output.text = "✅ Cliente insertado correctamente."
-                        firstNameField.clear(); lastNameField.clear(); emailField.clear()
-                    } else {
-                        output.text = "❌ Todos los campos son obligatorios."
+                    val dni = dniField.text.toInt()
+                    val nom = firstNameField.text
+                    val cognom1 = lastName1Field.text
+                    val cognom2 = lastName2Field.text
+                    val dataNaix = try {
+                        Date.valueOf(birthDateField.text)
+                    } catch (e: IllegalArgumentException) {
+                        output.text = "Invalid date format. Please use YYYY-MM-DD."
+                        return@setOnAction
                     }
+                    val telefon = phoneField.text
+                    val mail = emailField.text
+                    val role = roleSelector.value
+                    insertPersona(dni, nom, cognom1, cognom2, dataNaix, telefon, mail, role)
+                    output.text = "Persona insertada correctamente."
                 }
                 "Actualizar" -> {
-                    val id = idField.text.toIntOrNull()
-                    if (id != null && newEmailField.text.isNotBlank()) {
-                        updateCustomerEmail(id, newEmailField.text)
-                        output.text = "✅ Email actualizado."
-                        idField.clear(); newEmailField.clear()
-                    } else {
-                        output.text = "❌ ID inválido o email vacío."
+                    val dni = dniField.text.toInt()
+                    val nom = firstNameField.text
+                    val cognom1 = lastName1Field.text
+                    val cognom2 = lastName2Field.text
+                    val dataNaix = try {
+                        Date.valueOf(birthDateField.text)
+                    } catch (e: IllegalArgumentException) {
+                        output.text = "Invalid date format. Please use YYYY-MM-DD."
+                        return@setOnAction
                     }
+                    val telefon = phoneField.text
+                    val mail = emailField.text
+                    val role = roleSelector.value
+                    updatePersona(dni, nom, cognom1, cognom2, dataNaix, telefon, mail, role)
+                    output.text = "Persona actualizada correctamente."
                 }
                 "Eliminar" -> {
-                    val id = idField.text.toIntOrNull()
-                    if (id != null) {
-                        deleteCustomer(id)
-                        output.text = "✅ Cliente eliminado."
-                        idField.clear()
-                    } else {
-                        output.text = "❌ ID inválido."
-                    }
+                    val dni = dniField.text.toInt()
+                    deletePersona(dni)
+                    output.text = "Persona eliminada correctamente."
                 }
                 "Listar" -> {
-                    output.text = listCustomers(offset = currentOffset)
-                    currentOffset += 10
+                    output.text = listPersonas(currentOffset)
                 }
             }
         }
 
-        // Cambiar formulario al cambiar operación
+        // Change form when operation changes
         operationSelector.setOnAction {
             updateForm(operationSelector.value)
         }
 
-        // Mostrar formulario inicial
+        // Show initial form
         updateForm(operationSelector.value)
 
-        // Mostrar ventana
-        stage.scene = Scene(container, 420.0, 400.0)
-        stage.title = "Gestión de Clientes (CRUD)"
+        // Show window
+        stage.scene = Scene(container, 420.0, 600.0)
+        stage.title = "Gestión de Personas (CRUD)"
         stage.show()
-    }
-
-    // Mostrar hasta 10 clientes en texto plano
-    private fun listCustomers(offset: Int = 0): String {
-        val sql = "SELECT customerid, firstname, lastname, email FROM customers ORDER BY customerid ASC LIMIT 10 OFFSET $offset"
-        val builder = StringBuilder("📋 Clientes:\n")
-        try {
-            Database.getConnection()?.use { conn ->
-                conn.createStatement().use { stmt ->
-                    val rs = stmt.executeQuery(sql)
-                    var found = false
-                    while (rs.next()) {
-                        found = true
-                        builder.append("${rs.getInt("customerid")} - ${rs.getString("firstname")} ${rs.getString("lastname")} (${rs.getString("email")})\n")
-                    }
-                    if (!found) {
-                        builder.append("No hay más clientes.\n")
-                        currentOffset = 0 // Reiniciar si ya no hay más
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            return "❌ Error al consultar clientes: ${e.message}"
-        }
-        return builder.toString()
     }
 }
