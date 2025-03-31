@@ -1,26 +1,32 @@
 # Kotlin JavaFX CRUD Project
 
-Este proyecto es una app de escritorio en Kotlin que permite gestionar clientes mediante operaciones CRUD (Crear, Leer, Actualizar, Eliminar) en una base de datos PostgreSQL.
+This project is a desktop app in Kotlin that allows managing clients through CRUD operations (Create, Read, Update, Delete) in a PostgreSQL database.
 
-## Requisitos
+## 🏗 Requirements
 
 - IntelliJ IDEA
 - JDK 17+
-- PostgreSQL corriendo en localhost: 
-  - Debes especificar los datos de la conexión en Database.kt
-    - Base de datos: ds2 
-    - Usuario: ds2 ()
-    - Contraseña: ds2
+- PostgreSQL running on localhost:
+  - You must specify the connection data in `Database.kt`
+    - Database: ds2
+    - User: ds2
+    - Password: ds2
+  - You must execute the SQL script in `db/cemed.sql` to create the needed tables and inserts some example data.
 
-## Cómo ejecutar
+> This is the database schema used in the project:
+> ![Database Schema](db/squema.png)
 
-1. Abre el proyecto en IntelliJ IDEA (`File > Open...`).
-2. Espera a que Gradle sincronice.
-3. Abre `Main.kt` y haz clic en ▶️ para ejecutar la app.
 
-## Funcionalidad
-- Desde la GUIApp puedes seleccionar la operación CRUD a realizar:
-  - Insertar clientes
-  - Listar clientes (en bloques de 10)
-  - Actualizar email
-  - Eliminar clientes
+## 🛠 How to run
+
+1. Open the project in IntelliJ IDEA (`File > Open...`).
+2. Wait for Gradle to sync.
+3. Open `Main.kt` and click ▶️ to run the app.
+
+## 🚀 Functionality
+- From the `GUIApp` you can select the CRUD operation to perform:
+  - Insert clients
+  - List clients (in blocks of 10)
+  - Update email
+  - Delete clients
+
