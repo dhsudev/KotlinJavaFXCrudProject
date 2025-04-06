@@ -10,36 +10,45 @@ import javafx.scene.layout.HBox
 import javafx.scene.layout.VBox
 import javafx.stage.Stage
 import controllers.PersonaController
+import models.Persona
 import models.Role
 import services.persona.PersonaService
+import java.sql.Date
 
 class GUIApp : Application() {
 
     private val controller = PersonaController(PersonaService())
-    private var currentOffset = 0 // For pagination
+    private var currentOffset = 0
+    private var maxPages = 0
 
     override fun start(stage: Stage) {
         val operationSelector = createOperationSelector()
         val header = createHeader(operationSelector)
         val (labelsContainer, inputContainer) = createFormContainers()
         val output = Label()
-        val executeButton = createExecuteButton(operationSelector, labelsContainer, inputContainer, output)
-        val buttonContainer = createPaginationButtons(output)
+        val buttonContainer = createPaginationButtons(operationSelector, labelsContainer, inputContainer, output)
+        val executeButton = createExecuteButton(operationSelector, labelsContainer, inputContainer, output, buttonContainer)
 
-        val app = VBox(10.0, header, HBox(10.0, labelsContainer, inputContainer), VBox(10.0, executeButton, output, buttonContainer))
+        val app = VBox(
+            10.0,
+            header,
+            HBox(10.0, labelsContainer, inputContainer),
+            VBox(10.0, executeButton.apply { alignment = Pos.CENTER }, output, buttonContainer)
+        )
         app.padding = Insets(20.0)
         app.alignment = Pos.CENTER
 
         stage.scene = Scene(app, 420.0, 600.0)
-        stage.title = "Person Management (CRUD)"
+        stage.title = "CRUD App for Medical Center"
         stage.show()
 
         updateForm(operationSelector.value, labelsContainer, inputContainer)
         operationSelector.setOnAction {
             updateForm(operationSelector.value, labelsContainer, inputContainer)
+            currentOffset = 0
+            buttonContainer.isVisible = operationSelector.value == "List"
         }
     }
-
     private fun createOperationSelector(): ComboBox<String> {
         return ComboBox<String>().apply {
             items.addAll("Insert", "Update", "Delete", "List")
@@ -59,35 +68,58 @@ class GUIApp : Application() {
         return Pair(labelsContainer, inputContainer)
     }
 
-    private fun createExecuteButton(operationSelector: ComboBox<String>, labelsContainer: VBox, inputContainer: VBox, output: Label): Button {
+    private fun createExecuteButton(
+        operationSelector: ComboBox<String>,
+        labelsContainer: VBox,
+        inputContainer: VBox,
+        output: Label,
+        buttonContainer: HBox
+    ): Button {
         return Button("Execute Operation").apply {
             setOnAction {
-                handleExecuteButtonAction(operationSelector.value, labelsContainer, inputContainer, output)
+                handleExecution(operationSelector.value, labelsContainer, inputContainer, output)
+                buttonContainer.isVisible = operationSelector.value == "List"
             }
         }
     }
 
-    private fun createPaginationButtons(output: Label): HBox {
+    private fun createPaginationButtons(operationSelector: ComboBox<String>,
+                                        labelsContainer: VBox,
+                                        inputContainer: VBox,
+                                        output: Label): HBox {
         val nextButton = Button("▶️")
         val prevButton = Button("️◀️")
         val buttonContainer = HBox(10.0, prevButton, nextButton).apply {
             padding = Insets(10.0)
             alignment = Pos.CENTER
+            isVisible = false // Initially hidden
         }
 
         prevButton.setOnAction {
-            if (currentOffset > 0) currentOffset -= 10
-            output.text = controller.listPersonas(currentOffset)
+            if (currentOffset - 10 >= 0) currentOffset -= 10
+            handleExecution(operationSelector.value, labelsContainer, inputContainer, output)
         }
-
         nextButton.setOnAction {
-            currentOffset += 10
-            output.text = controller.listPersonas(currentOffset)
+            println("currentOffset: $currentOffset maxPages: $maxPages")
+            if(currentOffset + 10 <= maxPages) {
+                println("updatedOffset: $currentOffset")
+                currentOffset += 10
+            }
+            handleExecution(operationSelector.value, labelsContainer, inputContainer, output)
         }
-
         return buttonContainer
     }
 
+
+    private fun createLabeledField(labelText: String, inputControl: javafx.scene.Node): HBox {
+        val label = Label(labelText).apply {
+            minWidth = 100.0
+            alignment = Pos.CENTER_RIGHT
+        }
+        val hbox = HBox(10.0, label, inputControl)
+        hbox.alignment = Pos.CENTER_LEFT
+        return hbox
+    }
     private fun updateForm(selected: String, labelsContainer: VBox, inputContainer: VBox) {
         labelsContainer.children.clear()
         inputContainer.children.clear()
@@ -96,57 +128,142 @@ class GUIApp : Application() {
         val firstNameField = TextField().apply { promptText = "First Name" }
         val lastName1Field = TextField().apply { promptText = "Last Name 1" }
         val lastName2Field = TextField().apply { promptText = "Last Name 2" }
-        val birthDateField = TextField().apply { promptText = "Birth Date (YYYY-MM-DD)" }
+        val birthDateField = TextField().apply { promptText = "YYYY-MM-DD" }
         val phoneField = TextField().apply { promptText = "Phone" }
         val emailField = TextField().apply { promptText = "Email" }
         val roleSelector = ComboBox<String>().apply {
-            items.addAll(Role.NONE, Role.DOCTOR, Role.TECHNICIAN, Role.PATIENT)
-            value = Role.NONE
+            items.addAll(Role.NONE_EN, Role.DOCTOR_EN, Role.TECHNICIAN_EN, Role.PATIENT_EN)
+            value = Role.NONE_EN
+        }
+        roleSelector.setOnAction {
+            currentOffset = 0
+            maxPages = controller.getRegistersCount(roleSelector.value)
+        }
+        val additionalFields = when (roleSelector.value) {
+            Role.DOCTOR_EN -> {
+                val speciality = TextField().apply { promptText = "Speciality" }
+                listOf(createLabeledField("Speciality: ", speciality))
+            }
+            Role.PATIENT_EN -> {
+                val nss = TextField().apply { promptText = "NSS" }
+                val gender = TextField().apply { promptText = "Gender" }
+                listOf(
+                    createLabeledField("NSS: ", nss),
+                    createLabeledField("Gender: ", gender)
+                )
+            }
+            Role.TECHNICIAN_EN -> {
+                val startDate = TextField().apply { promptText = "Start Date (YYYY-MM-DD)" }
+                listOf(createLabeledField("Start Date: ", startDate))
+            }
+            else -> emptyList()
         }
 
         when (selected) {
             "Insert", "Update" -> {
-                labelsContainer.children.addAll(Label("Dni: "), Label("Name :"), Label("First lastName: "), Label("Second lastName: "), Label("Birth date: "), Label("Phone: "), Label("Email: "), Label("Role: "))
-                inputContainer.children.addAll(dniField, firstNameField, lastName1Field, lastName2Field, birthDateField, phoneField, emailField, roleSelector)
+                inputContainer.children.addAll(
+                    createLabeledField("Dni: ", dniField),
+                    createLabeledField("First Name: ", firstNameField),
+                    createLabeledField("Last Name 1: ", lastName1Field),
+                    createLabeledField("Last Name 2: ", lastName2Field),
+                    createLabeledField("Birth Date: ", birthDateField),
+                    createLabeledField("Phone: ", phoneField),
+                    createLabeledField("Email: ", emailField),
+                    createLabeledField("Role: ", roleSelector),
+                )
+                additionalFields.forEach { inputContainer.children.add(it) }
             }
+
             "Delete" -> {
-                labelsContainer.children.add(Label("Dni: "))
-                inputContainer.children.add(dniField)
+                inputContainer.children.add(createLabeledField("Dni: ", dniField))
             }
+
             "List" -> {
-                labelsContainer.children.add(Label("Role: "))
-                inputContainer.children.add(roleSelector)
+                inputContainer.children.add(createLabeledField("Role: ", roleSelector))
             }
         }
     }
 
-    private fun handleExecuteButtonAction(selected: String, labelsContainer: VBox, inputContainer: VBox, output: Label) {
-        val dniField = inputContainer.children[0] as TextField
-        val dni = dniField.text.toInt()
-
+    private fun handleExecution(
+        selected: String,
+        labelsContainer: VBox,
+        inputContainer: VBox,
+        output: Label
+    ) {
         when (selected) {
             "Insert", "Update" -> {
-                val name = (inputContainer.children[1] as TextField).text
-                val surname1 = (inputContainer.children[2] as TextField).text
-                val surname2 = (inputContainer.children[3] as TextField).text
-                val birthDate = (inputContainer.children[4] as TextField).text
-                val phone = (inputContainer.children[5] as TextField).text
-                val email = (inputContainer.children[6] as TextField).text
-                val role = (inputContainer.children[7] as ComboBox<String>).value
+                val dni = (inputContainer.children[0] as HBox).children[1] as TextField
+                val name = (inputContainer.children[1] as HBox).children[1] as TextField
+                val surname1 = (inputContainer.children[2] as HBox).children[1] as TextField
+                val surname2 = (inputContainer.children[3] as HBox).children[1] as TextField
+                val birthDate = (inputContainer.children[4] as HBox).children[1] as TextField
+                val phone = (inputContainer.children[5] as HBox).children[1] as TextField
+                val email = (inputContainer.children[6] as HBox).children[1] as TextField
+                val role = (inputContainer.children[7] as HBox).children[1] as ComboBox<String>
+
+                val additionalData = mutableMapOf<String, Any>()
+                when (role.value) {
+                    Role.DOCTOR_EN -> {
+                        val speciality = (inputContainer.children[8] as HBox).children[1] as TextField
+                        additionalData["especialitat"] = speciality.text
+                    }
+                    Role.PATIENT_EN -> {
+                        val nss = (inputContainer.children[8] as HBox).children[1] as TextField
+                        val gender = (inputContainer.children[9] as HBox).children[1] as TextField
+                        additionalData["nss"] = nss.text
+                        additionalData["genere"] = gender.text[0]
+                    }
+                    Role.TECHNICIAN_EN -> {
+                        val startDate = (inputContainer.children[8] as HBox).children[1] as TextField
+                        additionalData["data_inici"] = Date.valueOf(startDate.text)
+                    }
+                }
 
                 output.text = if (selected == "Update") {
-                    controller.updatePersona(dni, name, surname1, surname2, birthDate, phone, email, role)
+                    controller.updatePersona(
+                        dni.text.toInt(),
+                        name.text,
+                        surname1.text,
+                        surname2.text,
+                        birthDate.text,
+                        phone.text,
+                        email.text,
+                        role.value,
+                        additionalData
+                    )
                 } else {
-                    controller.insertPersona(dni, name, surname1, surname2, birthDate, phone, email, role)
+                    controller.insertPersona(
+                        dni.text.toInt(),
+                        name.text,
+                        surname1.text,
+                        surname2.text,
+                        birthDate.text,
+                        phone.text,
+                        email.text,
+                        role.value,
+                        additionalData
+                    )
                 }
             }
+
             "Delete" -> {
-                output.text = controller.deletePersona(dni)
+                val dni = (inputContainer.children[0] as HBox).children[1] as TextField
+                output.text = controller.deletePersona(dni.text.toInt())
             }
+
             "List" -> {
-                val role = (inputContainer.children[0] as ComboBox<String>).value.lowercase()
-                output.text = controller.listPersonas(currentOffset, if(role == "None") "persona" else role)
+                val role = (inputContainer.children[0] as HBox).children[1] as ComboBox<String>
+                output.text = formatList(controller.listPersonas(
+                    currentOffset,
+                    Role.toCatalan(role.value).lowercase()
+                ))
             }
         }
     }
+    private fun formatList(personas: List<Persona>): String{
+        var result = "Llista de ${personas[0].role}s:\n"
+        result += (personas.joinToString("\n") { it.toString() })
+        return result
+    }
 }
+
