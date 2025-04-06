@@ -44,6 +44,7 @@ class GUIApp : Application() {
 
         updateForm(operationSelector.value, labelsContainer, inputContainer)
         operationSelector.setOnAction {
+            println("SetOnAction de operationSelector")
             updateForm(operationSelector.value, labelsContainer, inputContainer)
             currentOffset = 0
             buttonContainer.isVisible = operationSelector.value == "List"
@@ -120,7 +121,7 @@ class GUIApp : Application() {
         hbox.alignment = Pos.CENTER_LEFT
         return hbox
     }
-    private fun updateForm(selected: String, labelsContainer: VBox, inputContainer: VBox) {
+    private fun updateForm(selected: String, labelsContainer: VBox, inputContainer: VBox, selectedRole : String = Role.NONE_EN) {
         labelsContainer.children.clear()
         inputContainer.children.clear()
 
@@ -133,12 +134,16 @@ class GUIApp : Application() {
         val emailField = TextField().apply { promptText = "Email" }
         val roleSelector = ComboBox<String>().apply {
             items.addAll(Role.NONE_EN, Role.DOCTOR_EN, Role.TECHNICIAN_EN, Role.PATIENT_EN)
-            value = Role.NONE_EN
+            value = selectedRole
         }
+
         roleSelector.setOnAction {
             currentOffset = 0
             maxPages = controller.getRegistersCount(roleSelector.value)
+            println("SetOnAction de roleSelector")
+            updateForm(selected, labelsContainer, inputContainer, roleSelector.value) // Update form on role change
         }
+
         val additionalFields = when (roleSelector.value) {
             Role.DOCTOR_EN -> {
                 val speciality = TextField().apply { promptText = "Speciality" }
@@ -183,7 +188,6 @@ class GUIApp : Application() {
             }
         }
     }
-
     private fun handleExecution(
         selected: String,
         labelsContainer: VBox,
