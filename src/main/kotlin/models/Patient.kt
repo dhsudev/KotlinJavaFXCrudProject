@@ -1,6 +1,6 @@
 package models
 
-data class Pacient(
+data class Patient(
     val nss: String,
     val genere: Char,
     val persona: Persona
